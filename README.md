@@ -1,139 +1,217 @@
 # Retail Sales ETL & Business Insights
 
-**From raw retail records to a clearer picture of store performance, shopping patterns, and economic context.**
+**Turning three raw retail datasets into a structured PostgreSQL model—and using that model to understand sales performance, seasonal demand, and economic context.**
 
-**Tech stack:** Python · Pandas · PostgreSQL · SQLAlchemy · SQL
+`Python` · `Pandas` · `SQLAlchemy` · `PostgreSQL` · `SQL` · `Exploratory Data Analysis`
 
-## Why this project matters
+## Project overview
 
-A store can report strong sales and still leave important questions unanswered. Is the performance consistent throughout the year? Is it concentrated in a handful of departments? Do holiday weeks look different from regular weeks? And how should external conditions—such as fuel prices or unemployment—be considered when interpreting the numbers?
+Retail sales numbers rarely explain themselves. A higher total might reflect a larger store, a stronger department, a holiday week, or simply more observations. Economic indicators can add context, but they are recorded at a different level of detail from individual department sales. Comparing these measures without preparing the data first risks drawing the wrong conclusions.
 
-This project explores those questions by building a reproducible **Extract, Transform, Load (ETL) pipeline** and using SQL to analyze weekly retail sales. The aim is not simply to move CSV files into a database. It is to turn disconnected records into a dataset that makes business comparisons easier to investigate, explain, and eventually visualize.
+I built this project to approach that problem from two directions. **On the data engineering side**, I use Python to extract three CSV files, transform them into four related tables, and load the results into PostgreSQL. **On the analytical side**, I join those tables into a dedicated `retail_eda` table and use SQL to investigate store performance, department contributions, holidays, and economic conditions.
 
-## At a glance
+The central idea is simple: **organize the data according to what each record represents before asking business questions of it**. The pipeline is as important as the final numbers, because trustworthy comparisons depend on trustworthy data preparation.
 
-The exported `retail_eda` dataset used for this analysis contains:
+## The business questions
 
-| Measure | Dataset snapshot |
-| --- | ---: |
-| Sales observations | **170,640** |
-| Stores | **18** |
-| Departments | **80** |
-| Distinct weekly dates | **143** |
-| Date range | **5 Feb 2010 – 26 Oct 2012** |
-| Total recorded sales | **2,939,547,602.88** |
-| Missing values in the exported analytical columns | **0** |
-| Duplicate Store–Department–Date combinations | **0** |
+The analysis is guided by four practical questions:
 
-*Sales amounts are shown in the units of the source data; the currency is not specified in the exported file. This is the supplied snapshot, not a claim about every store in a wider retail network.*
+1. **Where do sales come from?** Which stores and departments contribute most to the total, and how does performance vary by store type?
+2. **How does performance change over time?** Are there visible seasonal patterns, and how should partial years be compared?
+3. **What happens during holiday weeks?** Is average sales performance different from non-holiday weeks, after accounting for unequal numbers of observations?
+4. **What role might external conditions play?** How can temperature, fuel prices, the Consumer Price Index (CPI), and unemployment provide context without being mistaken for proven causes?
 
-## Business questions
+This is an exploratory project, not a forecasting or causal-inference model. Its purpose is to uncover patterns, validate assumptions, and identify questions worth investigating further.
 
-The analysis is organized around four questions:
+## Data: what I started with
 
-1. **Sales performance:** How do sales vary over time, and which stores and departments contribute the most?
-2. **Store differences:** How do store types and store sizes relate to observed sales performance?
-3. **Holiday patterns:** Are average weekly sales different during holiday and non-holiday periods?
-4. **Economic context:** How do temperature, fuel prices, CPI, and unemployment move alongside retail sales?
+The project begins with **three original CSV files**, each describing a different part of the retail operation.
 
-Together, these questions connect the data pipeline to a practical business goal: understanding *where performance comes from* and *which comparisons need more context* before drawing conclusions.
+| Original file | Rows | Grain / what one row represents | Core fields |
+| --- | ---: | --- | --- |
+| `Data/sales_dataset.csv` | **421,570** | One store–department–week sales observation | `Store`, `Dept`, `Date`, `Weekly_Sales`, `IsHoliday` |
+| `Data/Features_dataset.csv` | **8,190** | One store–date observation of external conditions | `Store`, `Date`, `Temperature`, `Fuel_Price`, `CPI`, `Unemployment`, `IsHoliday`, `MarkDown1`–`MarkDown5` |
+| `Data/stores_dataset.csv` | **45** | One store | `Store`, `Type`, `Size` |
 
-## How the data moves
+The original sales data covers **45 stores, 81 departments, and 143 distinct weekly dates from 5 February 2010 to 26 October 2012**. The features file extends beyond that sales period, so the full features file should not be treated as a list of sales weeks.
+
+These inputs were kept separate at extraction because they have **different meanings and different levels of detail**. Store type and size describe a store, economic variables describe conditions for a store on a date, and sales describe an individual department's activity within that store and week.
+
+## How the pipeline works
 
 ```mermaid
-flowchart LR
-    A[Three CSV datasets] --> B[Extract · Pandas]
-    B --> C[Transform · dates and dimensions]
-    C --> D[Load · PostgreSQL]
-    D --> E[(fact_sales + 3 dimensions)]
-    E --> F[(retail_eda)]
-    F --> G[SQL quality checks & EDA]
-    G --> H[Reporting / dashboard-ready output]
+flowchart TD
+    A[Sales CSV] --> D[Extract with Pandas]
+    B[Features CSV] --> D
+    C[Stores CSV] --> D
+    D --> E[Transform in Python]
+    E --> F[fact_sales]
+    E --> G[dim_store]
+    E --> H[dim_feature]
+    E --> I[dim_date]
+    F --> J[(PostgreSQL: retail_project)]
+    G --> J
+    H --> J
+    I --> J
+    J --> K[SQL LEFT JOIN by matching keys]
+    K --> L[(retail_eda analytical table)]
+    L --> M[Quality checks and business EDA]
+    M --> N[Dashboard-ready findings]
 ```
 
-### Source datasets
+### 1. Extract — bring in the original data
 
-| File | What it contributes |
-| --- | --- |
-| `Data/sales_dataset.csv` | Weekly sales by store and department, dates, and holiday indicators |
-| `Data/Stores_dataset.csv` | Store category and store size |
-| `Data/Features_dataset.csv` | Temperature, fuel prices, CPI, unemployment, and other original features |
+`ETL/extract.py` loads the three files with Pandas, previews their first rows and data types, and passes the DataFrames into the next stage. At this point, no JOIN is performed. Keeping extraction separate makes it easier to recognize issues in the source files before changing their structure.
 
-### The ETL pipeline
+### 2. Transform — reorganize three inputs into four tables
 
-- **Extract — `ETL/extract.py`:** Reads the three CSV files into Pandas DataFrames and prints initial samples and data types.
-- **Transform — `ETL/transform.py`:** Parses the source-specific date formats, removes `MarkDown1`–`MarkDown5` from the feature dataset, normalizes column names, and prepares one fact table and three dimensions.
-- **Load — `ETL/load.py`:** Writes those four tables to PostgreSQL through SQLAlchemy. Connection credentials are read from a local `.env` file, not hard-coded in the Python source.
-- **Orchestration — `main.py`:** Executes the steps in order so the ingestion process can be reproduced with one command.
+`ETL/transform.py` creates **four output DataFrames from the three source datasets**. This is a deliberate modeling choice: the transformed data separates measurable sales activity from the attributes used to describe and compare it.
 
-### Analytical data model
+| Transformed table | Built from | Intended analytical role | Rows from the supplied raw data |
+| --- | --- | --- | ---: |
+| `fact_sales` | Sales CSV | The main sales records, at store–department–week grain | **421,570** |
+| `dim_store` | Stores CSV | Store type and size, associated with each store | **45** |
+| `dim_feature` | Features CSV | Temperature and economic context by store and date | **8,190** |
+| `dim_date` | Unique `Date`–`IsHoliday` pairs from sales | Calendar fields for time-based comparisons | **143** |
 
-| PostgreSQL table | Purpose | Main fields |
+The transformation script performs the following operations:
+
+- Parses the sales dates using `DD/MM/YYYY` and features dates using `YYYY-MM-DD`, preventing mismatches when the two datasets are joined.
+- Removes the five `MarkDown` columns from the features data. This narrows the current analysis to the selected economic and environmental indicators; it also means promotional markdown effects are **outside this project's present scope**.
+- Applies `drop_duplicates()` when preparing the dimension DataFrames, and derives `year`, `month`, and ISO `week` for `dim_date`.
+- Normalizes column names to lowercase with underscores for consistent SQL references.
+- Retains the original sales values, including negative and zero amounts, rather than silently altering observations that may have a business explanation.
+
+**Why not just combine everything in Python immediately?** Separating the tables makes the data's grain and relationships visible. The same store attributes apply to many department records, and the same economic reading applies to multiple departments in one store-week. The resulting design is *star-schema-inspired*; it is not presented as a fully constrained dimensional warehouse, because primary/foreign-key constraints are not created by the current scripts.
+
+### 3. Load — store the model in PostgreSQL
+
+`ETL/load.py` writes `dim_store`, `dim_date`, `dim_feature`, and `fact_sales` into the `public` schema of the **`retail_project`** PostgreSQL database with SQLAlchemy. `main.py` coordinates the Extract → Transform → Load sequence.
+
+The database connection reads its settings from a local `.env` file. This keeps credentials out of the Python source and GitHub repository.
+
+**Implementation detail:** The current loader uses `if_exists='replace'`. That is convenient for rebuilding a development database, but every ETL run replaces the four tables. It is not an incremental-load strategy, and it can affect dependent database objects. Run it intentionally and on a development database.
+
+### 4. SQL JOIN — build `retail_eda` for analysis
+
+After the four tables exist in PostgreSQL, `retail.sql` creates **a separate physical table** named `retail_eda` using `CREATE TABLE ... AS SELECT`. This JOIN takes place **in PostgreSQL, after the Python transformation and load**, not inside `transform.py`.
+
+| Join | Matching rule | Reason |
 | --- | --- | --- |
-| `fact_sales` | Weekly store–department sales observations | `store`, `dept`, `date`, `weekly_sales`, `isholiday` |
-| `dim_store` | Store attributes | `store`, `type`, `size` |
-| `dim_feature` | Store-level conditions by date | `store`, `date`, `temperature`, `fuel_price`, `cpi`, `unemployment` |
-| `dim_date` | Reporting calendar | `date`, `year`, `month`, `week` |
+| `fact_sales` → `dim_store` | `store = store` | Assigns store type and size to sales records |
+| `fact_sales` → `dim_feature` | Match **both `store` and `date`** | Connects economic conditions to the correct store **and week** |
+| `fact_sales` → `dim_date` | `date = date` | Adds year, month, and week attributes |
 
-The SQL script joins these tables into **`retail_eda`**, a physical analysis table. Store attributes are matched by `store`; economic features are matched by **both `store` and `date`**; and calendar attributes are matched by `date`. Using both keys for economic features prevents sales records from being matched to unrelated weeks.
+Using **`LEFT JOIN` from `fact_sales`** is intentional: sales observations should remain in the analysis even if a dimension has no matching record. Matching features on *store and date* is especially important; matching only on store could multiply sales rows across many weeks and inflate totals.
 
-## What the analysis reveals
+`retail_eda` makes common analytical questions easier to answer without rewriting the four-table JOIN every time. Because it is a **physical table rather than a view**, changes to the underlying ETL tables do **not** automatically update it. The table has to be rebuilt or refreshed separately.
 
-The following observations were calculated from the supplied `retail_eda` CSV snapshot. They describe the available data; they are not causal claims.
+## Data validation: why the 45-store source and 18-store export differ
 
-### 1. Sales are unevenly distributed
+During validation, I found an important **coverage mismatch** between the original data and a CSV exported from `retail_eda`.
 
-Across all observations, total recorded sales are approximately **2.94 billion** in source-data units. The average sales value per store–department–week record is **17,226.60**, while the median is **8,133.55**. That gap suggests a right-skewed distribution: high-value observations pull the average above the typical record.
+| Measure | Original sales CSV | Supplied `retail_eda` CSV export |
+| --- | ---: | ---: |
+| Rows | **421,570** | **170,640** |
+| Distinct stores | **45** | **18** |
+| Distinct departments | **81** | **80** |
+| Distinct sales dates | **143** | **143** |
+| Coverage of original sales rows | 100% | **40.48%** |
 
-Why it matters: a single average may overstate what an ordinary department-week looks like. Medians, percentiles, and outlier checks provide necessary context.
+The difference is **not** explained by the business meaning of the JOIN. In the supplied raw files, store identifiers and feature store–date keys are unique where expected; every original sales row has a matching store and store–date feature record. The intended `LEFT JOIN` should therefore be capable of retaining **all 421,570 sales rows**, assuming the database contains the complete transformed inputs.
 
-### 2. A small set of stores and departments contributes substantially
+A row-by-row comparison also confirms that **all 170,640 exported sales records are present in the original sales CSV**. However, coverage is uneven:
 
-**Store 4** records the highest cumulative sales in this snapshot, at approximately **299.54 million**. **Department 92** leads the department ranking with approximately **181.59 million**.
+- **Store 2–17:** All original sales rows are present in the export.
+- **Store 1:** **9,204 of 10,244** rows are present; the missing **1,040** are concentrated at the beginning of the date range.
+- **Store 18:** **4,352 of 9,859** rows are present; the missing **5,507** are concentrated in the later dates.
+- **Store 19–45:** No records appear in the supplied export.
 
-The available records include **8 Type A stores** and **10 Type B stores**. Type A contributes roughly **64.6%** of recorded sales, compared with **35.4%** from Type B. This is a contribution comparison, not proof that one category operates more efficiently: store size, department mix, and coverage also matter. No Type C stores appear in this exported snapshot.
+**What this means:** the supplied CSV is an **incomplete analytical snapshot**, not evidence that the original business operated only 18 stores. The exact reason cannot be established from CSV files alone. It may reflect a partial export, a filtered result, or incomplete data in the PostgreSQL tables at the time of export. The decisive check is to compare row counts **inside PostgreSQL** before exporting again.
 
-### 3. Holiday weeks show a higher average, with an important qualification
+Run these queries in pgAdmin:
 
-Average sales per store–department–week observation are approximately **18,483.94** during holiday weeks and **17,130.89** during non-holiday weeks—about **7.9% higher** during the holiday observations.
+```sql
+-- How much of the original sales data is actually in PostgreSQL?
+SELECT COUNT(*) AS rows, COUNT(DISTINCT store) AS stores
+FROM public.fact_sales;
 
-However, the dataset contains only **10 distinct holiday-week dates**, versus **133 non-holiday-week dates**. The comparison is descriptive and can be influenced by which stores, departments, and periods are represented. It does **not** establish that holidays caused the difference.
+-- How much of the joined analytical table is in PostgreSQL?
+SELECT COUNT(*) AS rows, COUNT(DISTINCT store) AS stores
+FROM public.retail_eda;
 
-### 4. Economic indicators add context rather than simple explanations
+-- Which stores are represented in the analytical table?
+SELECT store, COUNT(*) AS sales_records
+FROM public.retail_eda
+GROUP BY store
+ORDER BY store;
+```
 
-The project compares sales with temperature, fuel prices, CPI, and unemployment. To avoid counting the same economic reading multiple times across departments, an additional check aggregated sales at the **store–date level** before calculating correlations. In that comparison, CPI had an approximately **−0.278** linear correlation with sales, while the other indicators showed correlations much closer to zero.
+**Interpret the results:**
 
-These relationships should be explored further by store, period, and department. A correlation is not a causal effect, and broad economic variables may not explain short-term store performance on their own.
+- If `fact_sales` and `retail_eda` both show **421,570 rows / 45 stores**, then the exported CSV is incomplete: re-export the full table, not a partial result grid or selected subset.
+- If `fact_sales` has **421,570 rows / 45 stores**, but `retail_eda` has fewer, inspect the SQL used to create `retail_eda`, any filters, and whether it was built from an earlier database state.
+- If `fact_sales` itself has fewer rows or stores, investigate the source loaded into PostgreSQL and whether the ETL pipeline completed successfully.
 
-### 5. Data quality is part of the business story
+This check is part of the analytical work: before trusting a headline number or publishing a dashboard, **reconcile the analysis table against the source at the correct level of detail**.
 
-The exported analytical columns contain **no missing values** and **no duplicate Store–Department–Date keys**. They do include **469 negative sales values** and **33 zero-sales values**.
+## Exploratory data analysis and business findings
 
-Those records should be investigated, not automatically deleted: negative amounts could represent returns or adjustments, but the dataset alone does not confirm their origin. Preserving them makes the analysis more transparent.
+The findings below are calculated from the **complete supplied raw sales CSV (45 stores)** unless explicitly stated otherwise. They describe observed patterns, not causal effects. Sales amounts are expressed in **source-data units** because a currency is not specified in the files.
 
-## Analytical approach and SQL coverage
+### Sales concentration and store performance
 
-The repository's `retail.sql` script contains queries for:
+Across the original 421,570 records, total recorded sales are approximately **6.74 billion**. Mean sales per store–department–week observation are **15,981.26**, compared with a median of **7,612.03**. The large gap shows why the median is useful alongside the mean: relatively high sales records can pull the average upward.
 
-- **Quality checks:** missing values, duplicate business keys, and negative/zero sales.
-- **Sales analysis:** yearly sales summaries, the highest-selling stores and departments, and comparisons by store type.
-- **Holiday analysis:** holiday versus non-holiday averages and year-by-year comparisons.
-- **Economic analysis:** yearly sales alongside average temperature, fuel prices, CPI, and unemployment. Economic readings are deduplicated at store–date level before annual averages are calculated.
+**Store 20** has the largest cumulative sales in the full dataset (approximately **301.40 million**), followed closely by **Store 4** (approximately **299.54 million**). At department level, **Department 92** contributes the highest total (approximately **483.94 million**). These rankings help identify where a retailer could begin a closer performance review, but totals alone do not measure efficiency or profitability.
 
-A key design choice is to keep the **grain of analysis** explicit. The sales fact table is at store–department–week level, but economic data is at store–week level. Comparisons become misleading if those two levels are mixed without aggregation.
+By store type, the share of total recorded sales is approximately **64.3% Type A**, **29.7% Type B**, and **6.0% Type C**. These are contributions, not like-for-like productivity comparisons: the dataset includes **22 Type A, 17 Type B, and 6 Type C stores**, with different sizes and department mixes. A fairer comparison would also evaluate sales per store, per department, or relative to store size.
 
-## Reproduce the pipeline
+### Holiday and non-holiday demand
 
-**Requirements:** Python, PostgreSQL, and access to the three source CSV files in `Data/`.
+Average sales per observation are about **17,035.82** in holiday weeks versus **15,901.45** in non-holiday weeks—approximately **7.1% higher** during holiday observations in the original sales dataset.
 
-1. Clone or download this repository and open its root folder.
-2. Install the Python dependencies:
+This comparison uses averages rather than simply comparing total sales because there are **10 distinct holiday dates** and **133 non-holiday dates**. It suggests that holiday periods deserve attention in planning, but it does **not** show that the holiday flag itself caused higher sales. Product mix, specific holidays, store composition, and timing can also influence the result.
+
+### Store characteristics and economic context
+
+Store size is worth investigating alongside sales, but a larger total can reflect greater capacity rather than stronger performance per unit of space. Similarly, temperature, fuel prices, CPI, and unemployment may move with demand without independently explaining it.
+
+A separate exploratory check aligned the original sales data and economic observations at **one row per store and date (6,435 store-weeks)**. The resulting simple linear correlations between store-week sales and individual indicators were relatively weak: approximately **−0.064** for temperature, **+0.009** for fuel price, **−0.073** for CPI, and **−0.106** for unemployment. These are descriptive checks, not the output of a multivariable or causal model.
+
+This **grain alignment** matters. The same temperature or CPI observation is repeated across departments after the JOIN. Calculating relationships directly on those repeated rows can give undue weight to store-weeks with more department records. For economic comparisons, sales should first be aggregated to store–date level and matched to a single corresponding economic observation.
+
+### Data quality and interpretation
+
+The original sales file includes **1,285 negative sales values** and **73 zero-sales values**. They are not automatically removed. Negative figures might indicate returns or adjustments, but the files do not contain a transaction-level explanation to verify that. Automatically deleting them would change the totals and could conceal a relevant operational pattern.
+
+The supplied 18-store export contains **469 negative** and **33 zero** sales records, with **no missing values in its 14 analytical columns** and no duplicate store–department–date keys. These clean-looking export statistics do not resolve its coverage gap: **a dataset can have no nulls and still be incomplete**.
+
+Finally, **2010 and 2012 are partial calendar years** in the sales data. Their annual sales totals should not be compared directly with the full year 2011 as though all three years had equal observation windows.
+
+## What the SQL analysis covers
+
+The `retail.sql` file documents the analytical steps performed in PostgreSQL:
+
+- **Integrity checks:** missing fields, duplicate store–department–date combinations, and negative/zero sales.
+- **Sales analysis:** yearly totals, top-selling stores and departments, and store-type comparisons.
+- **Holiday analysis:** holiday versus non-holiday average sales and year-based comparisons.
+- **Economic analysis:** annual average temperature, fuel prices, CPI, and unemployment alongside yearly sales.
+
+For the economic annual averages, the SQL deduplicates observations by store and date before calculating means, avoiding repeated economic readings for each department. The store-week correlations mentioned above are an additional validation performed on the supplied data, **not a query currently contained in `retail.sql`**.
+
+## Reproducing the project
+
+**Requirements:** Python, PostgreSQL, and the three original CSV files in the `Data/` directory.
+
+1. Clone the repository and open the project folder.
+2. Install dependencies:
 
    ```bash
    python -m pip install pandas sqlalchemy psycopg python-dotenv
    ```
 
-3. Create a **local** `.env` file in the project root (never commit it):
+3. Create a local `.env` file in the project root (do **not** commit it):
 
    ```dotenv
    DB_HOST=localhost
@@ -143,15 +221,17 @@ A key design choice is to keep the **grain of analysis** explicit. The sales fac
    DB_PASSWORD=your_local_password
    ```
 
-4. Create the PostgreSQL database `retail_project` if it does not exist, then run:
+4. Create the `retail_project` database in PostgreSQL if necessary, then run:
 
    ```bash
    python main.py
    ```
 
-5. Open `retail.sql` in pgAdmin to inspect the JOIN, create `retail_eda`, and run the exploratory queries. If running statements directly in PostgreSQL, replace the script's `#` section labels with valid `--` SQL comments first.
+5. Open `retail.sql` in pgAdmin. Run the analytical-table `CREATE TABLE retail_eda AS ...` statement, then the EDA queries. **Before running the entire script**, change any `#` section markers into valid PostgreSQL `--` comments. If `retail_eda` already exists, decide whether to drop/rebuild it before rerunning `CREATE TABLE`.
+6. Validate that `fact_sales` and `retail_eda` have the expected **421,570 records across 45 stores**, assuming all supplied raw sales data was loaded and no deliberate filters were introduced.
+7. Export the **entire** `retail_eda` table for Excel or BI analysis; check the exported row and store counts again before using it in a dashboard.
 
-**Important:** The loader currently uses `if_exists='replace'` for its four tables, so rerunning the pipeline **replaces** their contents. The physical `retail_eda` table is also **not automatically refreshed** when its source tables change; rebuild it separately when you need an updated analysis snapshot. Use a development database rather than a production one.
+**Security note:** `.env` belongs in `.gitignore`. Do not commit database passwords or connection strings with embedded credentials.
 
 ## Repository structure
 
@@ -160,7 +240,7 @@ Retail_Project/
 ├── Data/
 │   ├── Features_dataset.csv
 │   ├── sales_dataset.csv
-│   └── Stores_dataset.csv
+│   └── stores_dataset.csv
 ├── ETL/
 │   ├── extract.py
 │   ├── transform.py
@@ -173,10 +253,10 @@ Retail_Project/
 
 ## Limitations and next steps
 
-The dataset covers **February 2010 to October 2012**, so 2010 and 2012 are not full calendar years. Comparing their yearly totals directly with 2011 can create misleading growth conclusions. The source snapshot also represents **18 stores**, not necessarily an entire retail chain.
+This repository documents an **ETL pipeline and SQL-based exploratory analysis**. It does not yet claim a completed, validated Power BI or Excel dashboard. A logical next step is a three-page report covering **Sales Overview**, **Store & Department Performance**, and **Holiday & Economic Insights**—built only after reconciling the full `retail_eda` export with PostgreSQL.
 
-The current repository focuses on the **ETL pipeline and SQL-based exploration**. A natural next step is to present the findings in Power BI or Excel, with pages for Sales Overview, Store & Department Performance, and Holiday & Economic Insights. Additional improvements include repeatable data-quality tests, safer incremental loading, clearer outlier treatment, and analyses that control for store and seasonal differences.
+The work can be extended by adding automated reconciliation tests, database constraints and indexes, a repeatable refresh process for the physical analytical table, improved handling of returned/negative sales, and comparisons that control for store size and seasonality. The current dataset also cannot establish the causal effects of holidays or economic conditions on sales.
 
 ---
 
-**Takeaway:** The value of this project lies in connecting engineering decisions to analytical judgment: build trustworthy data, ask questions at the right level of detail, and explain what the numbers can—and cannot—tell us about retail performance.
+**Project takeaway:** The goal was not simply to make data queryable. It was to build a traceable path from raw records to meaningful business questions—and to recognize when the evidence is incomplete before turning an interesting pattern into a conclusion.
