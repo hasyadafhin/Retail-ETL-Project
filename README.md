@@ -259,4 +259,94 @@ The work can be extended by adding automated reconciliation tests, database cons
 
 ---
 
-**Project takeaway:** The goal was not simply to make data queryable. It was to build a traceable path from raw records to meaningful business questions—and to recognize when the evidence is incomplete before turning an interesting pattern into a conclusion.
+## Power BI Dashboard — Retail Sales Analytics
+
+The Power BI dashboard transforms the processed `retail_eda` dataset into an interactive business intelligence report, providing insights into **sales performance, store contributions, seasonal demand, and economic conditions**.
+
+The dashboard consists of three analytical pages:
+
+| Dashboard Page | Main Focus |
+|---|---|
+| **Sales Overview** | Overall sales, monthly trends, and revenue distribution |
+| **Store & Department Performance** | Store rankings, department contributions, and store characteristics |
+| **Economic & Holiday Insights** | Economic indicators, holiday demand, and sales relationships |
+
+### 1. Sales Overview
+
+Provides a high-level view of retail performance across **45 stores and 81 departments** from February 2010 to October 2012.
+
+**Key Metrics**
+
+| Metric | Value |
+|---|---:|
+| Total Sales | **6.74bn** |
+| Average Weekly Sales | **15.98K** |
+| Total Stores | **45** |
+| Total Departments | **81** |
+
+**Business Insights**
+- **Store 20** generates the highest cumulative sales, approximately **301.4M**.
+- **Store Type A** contributes **64.28%** of total sales, followed by Type B (29.7%) and Type C (6.02%).
+- Monthly sales fluctuate considerably, indicating variations in retail demand across the reporting period.
+- Sales contributions are uneven across stores and store types, highlighting the importance of segment-level performance analysis.
+
+### 2. Store & Department Performance
+
+Examines how individual stores, departments, and store characteristics contribute to overall sales.
+
+**Key Metrics**
+
+| Metric | Value |
+|---|---:|
+| Active Stores | **45** |
+| Average Store Sales | **149.72M** |
+| Highest Performing Store | **Store 20** |
+| Total Departments | **81** |
+
+**Business Insights**
+- **Store 20 (301.4M)** and **Store 4 (299.5M)** lead cumulative sales performance.
+- Store Type A generates approximately **4.33bn**, compared with **2.00bn** for Type B and **0.41bn** for Type C.
+- **Department 92** records the highest sales contribution, approximately **483.9M**.
+- Larger stores often generate higher cumulative sales, but store size alone does not explain differences in performance.
+- Comparing stores by sales contribution and physical size helps identify opportunities for further operational analysis.
+
+### 3. Economic & Holiday Insights
+
+Explores the relationship between retail activity, economic indicators, and seasonal purchasing patterns.
+
+**Key Metrics**
+
+| Metric | Value |
+|---|---:|
+| Average CPI | **171.58** |
+| Average Fuel Price | **3.36** |
+| Average Unemployment | **8.00%** |
+| Holiday Sales Difference | **+7.8%** |
+
+**Economic Correlation Analysis**
+
+| Indicator | Pearson Correlation | Interpretation |
+|---|---:|---|
+| Temperature | -0.064 | Very weak negative |
+| Fuel Price | +0.009 | Almost no linear relationship |
+| CPI | -0.073 | Very weak negative |
+| Unemployment | -0.10 | Weak negative |
+
+**Business Insights**
+- Average store-week sales during holidays are approximately **7.8% higher** than during non-holiday periods.
+- Monthly sales patterns suggest seasonal demand variations, particularly toward the end of the year.
+- Economic indicators show **weak individual linear correlations** with sales, suggesting that retail performance involves multiple contributing factors.
+- Holiday trends can help inform inventory and operational planning, although the observed relationships do not establish causation.
+
+### Key Business Takeaways
+
+| Area | Main Finding | Business Implication |
+|---|---|---|
+| **Sales Performance** | Total sales reach approximately 6.74bn | Establishes an overall performance baseline |
+| **Store Performance** | Store 20 leads cumulative sales | Identifies high-contributing stores for further analysis |
+| **Store Types** | Type A contributes 64.28% of sales | Highlights concentration of revenue across store categories |
+| **Department Performance** | Department 92 contributes approximately 483.9M | Identifies a major departmental sales contributor |
+| **Holiday Demand** | Holiday store-week sales are 7.8% higher | Supports further investigation into seasonal demand planning |
+| **Economic Factors** | Correlations with sales are relatively weak | Encourages analysis beyond individual economic indicators |
+
+**Note:** These findings are descriptive and based on the available reporting data. Sales amounts use the dataset's original units. Correlation does not imply causation, and cumulative sales do not necessarily represent store efficiency or profitability.
