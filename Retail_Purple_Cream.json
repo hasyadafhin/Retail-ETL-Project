@@ -1,0 +1,200 @@
+{
+  "name": "Retail Purple & Cream",
+  "dataColors": [
+    "#8759BA",
+    "#765B91",
+    "#B79AD6",
+    "#D8B277",
+    "#5A3E78",
+    "#4B2E63"
+  ],
+  "background": "#F7F1E8",
+  "foreground": "#2F223A",
+  "tableAccent": "#8759BA",
+  "textClasses": {
+    "callout": {
+      "fontFace": "Segoe UI",
+      "fontSize": 27,
+      "color": "#2F223A"
+    },
+    "title": {
+      "fontFace": "Segoe UI",
+      "fontSize": 15,
+      "color": "#2F223A"
+    },
+    "header": {
+      "fontFace": "Segoe UI",
+      "fontSize": 11,
+      "color": "#2F223A"
+    },
+    "label": {
+      "fontFace": "Segoe UI",
+      "fontSize": 10,
+      "color": "#75677B"
+    }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": {
+              "solid": {
+                "color": "#FFFDF8"
+              }
+            },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": {
+              "solid": {
+                "color": "#E7DDD2"
+              }
+            },
+            "width": 1,
+            "radius": 4
+          }
+        ],
+        "dropShadow": [
+          {
+            "show": false
+          }
+        ],
+        "padding": [
+          {
+            "left": 12,
+            "top": 12,
+            "right": 12,
+            "bottom": 12
+          }
+        ],
+        "title": [
+          {
+            "show": true,
+            "fontFamily": "Segoe UI",
+            "fontSize": 15,
+            "fontColor": {
+              "solid": {
+                "color": "#2F223A"
+              }
+            },
+            "bold": true
+          }
+        ],
+        "categoryAxis": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10,
+            "labelColor": {
+              "solid": {
+                "color": "#75677B"
+              }
+            },
+            "showAxisTitle": false
+          }
+        ],
+        "valueAxis": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10,
+            "labelColor": {
+              "solid": {
+                "color": "#75677B"
+              }
+            },
+            "gridlineColor": {
+              "solid": {
+                "color": "#E7DDD2"
+              }
+            },
+            "showAxisTitle": false
+          }
+        ],
+        "labels": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10,
+            "color": {
+              "solid": {
+                "color": "#2F223A"
+              }
+            }
+          }
+        ],
+        "legend": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10,
+            "labelColor": {
+              "solid": {
+                "color": "#75677B"
+              }
+            },
+            "showTitle": false
+          }
+        ]
+      }
+    },
+    "cardVisual": {
+      "*": {
+        "value": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 27,
+            "fontColor": {
+              "solid": {
+                "color": "#2F223A"
+              }
+            }
+          }
+        ],
+        "label": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 11,
+            "fontColor": {
+              "solid": {
+                "color": "#75677B"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "lineChart": {
+      "*": {
+        "lineStyles": [
+          {
+            "strokeColor": {
+              "solid": {
+                "color": "#8759BA"
+              }
+            },
+            "strokeWidth": 3,
+            "lineChartType": "linear"
+          }
+        ]
+      }
+    },
+    "tableEx": {
+      "*": {
+        "columnHeaders": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10
+          }
+        ],
+        "values": [
+          {
+            "fontFamily": "Segoe UI",
+            "fontSize": 10
+          }
+        ]
+      }
+    }
+  }
+}

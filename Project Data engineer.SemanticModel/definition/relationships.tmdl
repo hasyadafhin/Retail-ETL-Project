@@ -1,0 +1,5 @@
+relationship 7e431365-a6bf-458d-bb49-84ede2617b5b
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 'public retail_eda'.date
+	toColumn: LocalDateTable_c55ae29e-94e0-4b67-8d3c-8f5ce56e9f7e.Date
+

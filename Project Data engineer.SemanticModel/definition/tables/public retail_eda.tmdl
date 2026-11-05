@@ -1,0 +1,491 @@
+table 'public retail_eda'
+	lineageTag: 9235641b-0be9-45a0-9590-3f8df33ae841
+
+	measure 'Total Sales' = ```
+			
+			SUM('public retail_eda'[weekly_sales])
+			
+			```
+		lineageTag: 77154e14-dc77-4c6f-9673-0a3f3a1f309f
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Average Weekly Sales' = ```
+			
+			AVERAGE('public retail_eda'[weekly_sales])
+			
+			
+			```
+		lineageTag: 86d98149-f051-4101-9669-b00cab8b9076
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Total Stores' = ```
+			
+			DISTINCTCOUNT('public retail_eda'[store])
+			
+			```
+		formatString: 0
+		lineageTag: d0c6e317-89f0-4f55-b7ae-aca72fbaa256
+
+	measure 'Total Departments' = ```
+			
+			DISTINCTCOUNT('public retail_eda'[dept])
+			
+			```
+		formatString: 0
+		lineageTag: 2099bb2e-c318-4b74-8239-4f465db9e629
+
+	measure 'Total Records' = ```
+			
+			COUNTROWS('public retail_eda')
+			
+			```
+		formatString: 0
+		lineageTag: 4dbc2094-6b22-4475-b304-5a43e0618cfb
+
+	measure 'Holiday Avg Sales' = ```
+			
+			CALCULATE(
+			    [Average Weekly Sales],
+			    'public retail_eda'[isholiday] = TRUE()
+			)
+			
+			```
+		lineageTag: 35b37566-18da-48b2-9efc-80aa0d8d4394
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Non-Holiday Avg Sales'
+		lineageTag: 89fcf699-221d-408f-8c06-9bcc8b525711
+
+	measure 'Holiday Difference %' = ```
+			
+			DIVIDE(
+			    [Holiday Avg Sales] - [Non-Holiday Avg Sales],
+			    [Non-Holiday Avg Sales]
+			)
+			
+			```
+		lineageTag: 521d0206-8e9f-4cda-a94e-9d5e10ef06d4
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	/// Total sales divided by distinct stores in the current selection.
+	measure 'Average Store Sales' = ```
+		DIVIDE([Total Sales], [Total Stores])
+		```
+		formatString: #,0.00
+		displayFolder: Retail Analytics
+		lineageTag: 94adfd5f-855e-553a-9528-ad5bbe5e24c9
+
+	/// Single-store size; repeated department records are not summed.
+	measure 'Store Size' = ```
+		IF(HASONEVALUE('public retail_eda'[store]), MAX('public retail_eda'[store_size]))
+		```
+		formatString: #,0
+		displayFolder: Retail Analytics
+		lineageTag: 983ac934-d508-5b4d-8344-c671515398ca
+
+	/// Type of the store in the current table row.
+	measure 'Store Type Label' = ```
+		SELECTEDVALUE('public retail_eda'[store_type])
+		```
+		displayFolder: Retail Analytics
+		lineageTag: c60c88a4-7c97-57ef-aed6-b8060693e61f
+
+	/// Store ID with greatest sales; ties resolved by smallest Store ID.
+	measure 'Highest Performing Store' = ```
+		VAR Candidates = FILTER(ADDCOLUMNS(VALUES('public retail_eda'[store]), "__Sales", [Total Sales]), NOT ISBLANK([__Sales]))
+		VAR Winner = TOPN(1, Candidates, [__Sales], DESC, 'public retail_eda'[store], ASC)
+		RETURN MINX(Winner, 'public retail_eda'[store])
+		```
+		formatString: 0
+		displayFolder: Retail Analytics
+		lineageTag: 186c3be4-2d13-52d5-a072-9e4524132d7d
+
+	/// Sales-descending ordinal rank among selected store values; ID ascending breaks ties, so Top N contains at most N items.
+	measure 'Store Sales Rank' = ```
+		VAR CurrentID = SELECTEDVALUE('public retail_eda'[store])
+		VAR CurrentSales = [Total Sales]
+		VAR Candidates = FILTER(ADDCOLUMNS(ALLSELECTED('public retail_eda'[store]), "__Sales", CALCULATE([Total Sales])), NOT ISBLANK([__Sales]))
+		RETURN
+		IF(NOT ISBLANK(CurrentID) && NOT ISBLANK(CurrentSales),
+		    1 + COUNTROWS(FILTER(Candidates,
+		        [__Sales] > CurrentSales || ([__Sales] = CurrentSales && 'public retail_eda'[store] < CurrentID))))
+		```
+		formatString: 0
+		displayFolder: Retail Analytics
+		lineageTag: b81f2fa6-0e05-561e-b768-8cd15b016633
+
+	/// Sales-descending ordinal rank among selected dept values; ID ascending breaks ties, so Top N contains at most N items.
+	measure 'Department Sales Rank' = ```
+		VAR CurrentID = SELECTEDVALUE('public retail_eda'[dept])
+		VAR CurrentSales = [Total Sales]
+		VAR Candidates = FILTER(ADDCOLUMNS(ALLSELECTED('public retail_eda'[dept]), "__Sales", CALCULATE([Total Sales])), NOT ISBLANK([__Sales]))
+		RETURN
+		IF(NOT ISBLANK(CurrentID) && NOT ISBLANK(CurrentSales),
+		    1 + COUNTROWS(FILTER(Candidates,
+		        [__Sales] > CurrentSales || ([__Sales] = CurrentSales && 'public retail_eda'[dept] < CurrentID))))
+		```
+		formatString: 0
+		displayFolder: Retail Analytics
+		lineageTag: b337ef77-ce15-5441-853e-95164726af9f
+
+	/// Equal-weight average of total department sales for each unique Store-Date observation; one date represents one sales week.
+	measure 'Average Store Weekly Sales' = ```
+		AVERAGEX(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]), CALCULATE([Total Sales]))
+		```
+		formatString: #,0.00
+		displayFolder: Retail Analytics
+		lineageTag: 585207f2-3feb-5ccd-a930-9b0c7a567fa8
+
+	/// Number of distinct Store-Date observations in the current filter context.
+	measure 'Store-Week Observations' = ```
+		COUNTROWS(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]))
+		```
+		formatString: #,0
+		displayFolder: Retail Analytics
+		lineageTag: cd2557ee-dda2-5824-a959-3e5e68d7f0d4
+
+	/// Equal-weight mean over unique Store-Date observations. Missing or conflicting indicator values are excluded by SELECTEDVALUE, not silently summed.
+	measure 'Average CPI' = ```
+		AVERAGEX(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]), CALCULATE(SELECTEDVALUE('public retail_eda'[cpi])))
+		```
+		formatString: 0.00
+		displayFolder: Retail Analytics
+		lineageTag: 7dc49c13-e5b5-5ea1-91c6-121dd3bbc0f8
+
+	/// Equal-weight mean over unique Store-Date observations. Missing or conflicting indicator values are excluded by SELECTEDVALUE, not silently summed.
+	measure 'Average Fuel Price' = ```
+		AVERAGEX(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]), CALCULATE(SELECTEDVALUE('public retail_eda'[fuel_price])))
+		```
+		formatString: 0.00
+		displayFolder: Retail Analytics
+		lineageTag: 6189c96d-0ac2-5a9b-a976-760b68c0db1a
+
+	/// Equal-weight mean over unique Store-Date observations. Missing or conflicting indicator values are excluded by SELECTEDVALUE, not silently summed.
+	measure 'Average Unemployment' = ```
+		AVERAGEX(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]), CALCULATE(SELECTEDVALUE('public retail_eda'[unemployment])))
+		```
+		formatString: 0.00
+		displayFolder: Retail Analytics
+		lineageTag: 5a0533a6-fdba-5315-97e4-1de8ae337058
+
+	/// Equal-weight mean over unique Store-Date observations. Missing or conflicting indicator values are excluded by SELECTEDVALUE, not silently summed.
+	measure 'Average Temperature' = ```
+		AVERAGEX(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]), CALCULATE(SELECTEDVALUE('public retail_eda'[temperature])))
+		```
+		formatString: 0.00
+		displayFolder: Retail Analytics
+		lineageTag: 6f71624f-ee74-52b3-a1aa-4ab96864aeee
+
+	/// Average store-week sales for this holiday class; intentionally overrides only the Holiday slicer for a two-class baseline comparison.
+	measure 'Holiday Store Weekly Sales' = ```
+		CALCULATE([Average Store Weekly Sales], REMOVEFILTERS('public retail_eda'[isholiday]), 'public retail_eda'[isholiday] = TRUE())
+		```
+		formatString: #,0.00
+		displayFolder: Retail Analytics
+		lineageTag: 613f8b8a-961c-5ab2-9649-eedecce80b70
+
+	/// Average store-week sales for this holiday class; intentionally overrides only the Holiday slicer for a two-class baseline comparison.
+	measure 'Non-Holiday Store Weekly Sales' = ```
+		CALCULATE([Average Store Weekly Sales], REMOVEFILTERS('public retail_eda'[isholiday]), 'public retail_eda'[isholiday] = FALSE())
+		```
+		formatString: #,0.00
+		displayFolder: Retail Analytics
+		lineageTag: a6b1f3c2-63a3-5429-a7a4-a9788a6781be
+
+	/// Relative difference between average holiday and non-holiday store-week sales; denominator is the non-holiday average. Other filters remain active; blank if either class is missing or denominator is zero.
+	measure 'Holiday Store Weekly Difference %' = ```
+		VAR HolidayAverage = [Holiday Store Weekly Sales]
+		VAR NonHolidayAverage = [Non-Holiday Store Weekly Sales]
+		RETURN IF(NOT ISBLANK(HolidayAverage) && NOT ISBLANK(NonHolidayAverage),
+		    DIVIDE(HolidayAverage - NonHolidayAverage, NonHolidayAverage))
+		```
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Retail Analytics
+		lineageTag: 47d39a5b-1ea9-5397-a2d0-c44749faff3d
+
+	/// For each calendar month, averages the store-week mean for each available selected year with equal year weight.
+	measure 'Seasonal Average Store Weekly Sales' = ```
+		AVERAGEX(VALUES('public retail_eda'[year]), [Average Store Weekly Sales])
+		```
+		formatString: #,0.00
+		displayFolder: Retail Analytics
+		lineageTag: 967db2db-0319-5c5a-8ed5-26dc1e3259f8
+
+	/// Pearson r between indicator and total store-week sales over pairwise complete unique Store-Date observations. Blank for fewer than 3 pairs or zero variance; association is not causation.
+	measure 'Temperature Sales Correlation' = ```
+		VAR Observations = FILTER(
+		    ADDCOLUMNS(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]),
+		        "__X", CALCULATE(SELECTEDVALUE('public retail_eda'[temperature])),
+		        "__Y", CALCULATE([Total Sales])),
+		    NOT ISBLANK([__X]) && NOT ISBLANK([__Y]))
+		VAR N = COUNTROWS(Observations)
+		VAR MeanX = AVERAGEX(Observations, [__X])
+		VAR MeanY = AVERAGEX(Observations, [__Y])
+		VAR Numerator = SUMX(Observations, ([__X] - MeanX) * ([__Y] - MeanY))
+		VAR Denominator = SQRT(SUMX(Observations, POWER([__X] - MeanX, 2)) * SUMX(Observations, POWER([__Y] - MeanY, 2)))
+		RETURN IF(N >= 3 && Denominator > 0, DIVIDE(Numerator, Denominator))
+		```
+		formatString: 0.000;-0.000;0.000
+		displayFolder: Retail Analytics
+		lineageTag: 610a94a5-920c-5cf4-8454-e5fd05ac3b9e
+
+	/// Pearson r between indicator and total store-week sales over pairwise complete unique Store-Date observations. Blank for fewer than 3 pairs or zero variance; association is not causation.
+	measure 'Fuel Price Sales Correlation' = ```
+		VAR Observations = FILTER(
+		    ADDCOLUMNS(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]),
+		        "__X", CALCULATE(SELECTEDVALUE('public retail_eda'[fuel_price])),
+		        "__Y", CALCULATE([Total Sales])),
+		    NOT ISBLANK([__X]) && NOT ISBLANK([__Y]))
+		VAR N = COUNTROWS(Observations)
+		VAR MeanX = AVERAGEX(Observations, [__X])
+		VAR MeanY = AVERAGEX(Observations, [__Y])
+		VAR Numerator = SUMX(Observations, ([__X] - MeanX) * ([__Y] - MeanY))
+		VAR Denominator = SQRT(SUMX(Observations, POWER([__X] - MeanX, 2)) * SUMX(Observations, POWER([__Y] - MeanY, 2)))
+		RETURN IF(N >= 3 && Denominator > 0, DIVIDE(Numerator, Denominator))
+		```
+		formatString: 0.000;-0.000;0.000
+		displayFolder: Retail Analytics
+		lineageTag: 83895adf-cb19-5324-bb4c-261e609e4c7f
+
+	/// Pearson r between indicator and total store-week sales over pairwise complete unique Store-Date observations. Blank for fewer than 3 pairs or zero variance; association is not causation.
+	measure 'CPI Sales Correlation' = ```
+		VAR Observations = FILTER(
+		    ADDCOLUMNS(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]),
+		        "__X", CALCULATE(SELECTEDVALUE('public retail_eda'[cpi])),
+		        "__Y", CALCULATE([Total Sales])),
+		    NOT ISBLANK([__X]) && NOT ISBLANK([__Y]))
+		VAR N = COUNTROWS(Observations)
+		VAR MeanX = AVERAGEX(Observations, [__X])
+		VAR MeanY = AVERAGEX(Observations, [__Y])
+		VAR Numerator = SUMX(Observations, ([__X] - MeanX) * ([__Y] - MeanY))
+		VAR Denominator = SQRT(SUMX(Observations, POWER([__X] - MeanX, 2)) * SUMX(Observations, POWER([__Y] - MeanY, 2)))
+		RETURN IF(N >= 3 && Denominator > 0, DIVIDE(Numerator, Denominator))
+		```
+		formatString: 0.000;-0.000;0.000
+		displayFolder: Retail Analytics
+		lineageTag: 0d3c97be-5a25-55d0-abef-0f440bc9bf2d
+
+	/// Pearson r between indicator and total store-week sales over pairwise complete unique Store-Date observations. Blank for fewer than 3 pairs or zero variance; association is not causation.
+	measure 'Unemployment Sales Correlation' = ```
+		VAR Observations = FILTER(
+		    ADDCOLUMNS(SUMMARIZE('public retail_eda', 'public retail_eda'[store], 'public retail_eda'[date]),
+		        "__X", CALCULATE(SELECTEDVALUE('public retail_eda'[unemployment])),
+		        "__Y", CALCULATE([Total Sales])),
+		    NOT ISBLANK([__X]) && NOT ISBLANK([__Y]))
+		VAR N = COUNTROWS(Observations)
+		VAR MeanX = AVERAGEX(Observations, [__X])
+		VAR MeanY = AVERAGEX(Observations, [__Y])
+		VAR Numerator = SUMX(Observations, ([__X] - MeanX) * ([__Y] - MeanY))
+		VAR Denominator = SQRT(SUMX(Observations, POWER([__X] - MeanX, 2)) * SUMX(Observations, POWER([__Y] - MeanY, 2)))
+		RETURN IF(N >= 3 && Denominator > 0, DIVIDE(Numerator, Denominator))
+		```
+		formatString: 0.000;-0.000;0.000
+		displayFolder: Retail Analytics
+		lineageTag: df2a7797-0c34-5877-8d21-a16d719591e0
+
+	/// Dynamic observation recalculated for the selected stores and period.
+	measure 'Insight Leading Store' = ```
+		VAR Winner = [Highest Performing Store]
+		VAR WinnerSales = CALCULATE([Total Sales], KEEPFILTERS('public retail_eda'[store] = Winner))
+		RETURN IF(ISBLANK(Winner), "No store sales in the current selection.",
+		    "Store " & FORMAT(Winner, "0") & " leads with " & FORMAT(DIVIDE(WinnerSales,1000000), "0.0") & "M in sales (" & FORMAT(DIVIDE(WinnerSales,[Total Sales]), "0.0%") & " of selected sales).")
+		```
+		displayFolder: Retail Analytics
+		lineageTag: 67e90d82-0f03-5293-aa83-bf070100d8d6
+
+	/// Dynamic comparison using equal-weight Store-Date averages; no causal claim.
+	measure 'Insight Holiday Comparison' = ```
+		VAR Difference = [Holiday Store Weekly Difference %]
+		RETURN IF(ISBLANK(Difference), "Holiday comparison unavailable: both classes and a nonzero baseline are required.",
+		    "Holiday store-week sales are " & FORMAT(ABS(Difference), "0.0%") & IF(Difference >= 0, " higher", " lower") & " than non-holiday weeks; Holiday filter excluded from this comparison.")
+		```
+		displayFolder: Retail Analytics
+		lineageTag: 2a967b90-a804-5dc0-b77a-d97cd28f065e
+
+	/// Dynamic observation count and date coverage for the current context.
+	measure 'Insight Observation Scope' = ```
+		VAR N = [Store-Week Observations]
+		RETURN IF(N = 0, "No store-week observations in the current selection.",
+		    FORMAT(N, "#,0") & " store-week observations from " & FORMAT(MIN('public retail_eda'[date]), "MMM yyyy") & " to " & FORMAT(MAX('public retail_eda'[date]), "MMM yyyy") & ". Correlation describes association, not causation.")
+		```
+		displayFolder: Retail Analytics
+		lineageTag: c2800c5d-c592-57d3-af3b-72e28820b0c3
+
+	column store
+		dataType: int64
+		formatString: 0
+		lineageTag: 90d14df3-17de-48aa-b46c-9bfb69bfa6ae
+		summarizeBy: sum
+		sourceColumn: store
+
+		annotation SummarizationSetBy = Automatic
+
+	column dept
+		dataType: int64
+		formatString: 0
+		lineageTag: 39c04445-aee1-4461-9cdb-fe4a347cb5a8
+		summarizeBy: sum
+		sourceColumn: dept
+
+		annotation SummarizationSetBy = Automatic
+
+	column date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: eb5995b4-f698-46a8-b38a-10619f6cacec
+		summarizeBy: none
+		sourceColumn: date
+
+		variation Variation
+			isDefault
+			relationship: 7e431365-a6bf-458d-bb49-84ede2617b5b
+			defaultHierarchy: LocalDateTable_c55ae29e-94e0-4b67-8d3c-8f5ce56e9f7e.'Date Hierarchy'
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column weekly_sales
+		dataType: double
+		lineageTag: f577d840-3026-4839-b782-ef46d48eb80f
+		summarizeBy: sum
+		sourceColumn: weekly_sales
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column isholiday
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 9e34e2dc-14ff-4cfb-828f-008456763183
+		summarizeBy: none
+		sourceColumn: isholiday
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_type
+		dataType: string
+		lineageTag: 2c2dbc3e-8e14-4914-8e3b-d8d875d97fa5
+		summarizeBy: none
+		sourceColumn: store_type
+
+		annotation SummarizationSetBy = Automatic
+
+	column store_size
+		dataType: int64
+		formatString: 0
+		lineageTag: e14625b2-9352-4f43-bc2e-89308c67da9c
+		summarizeBy: sum
+		sourceColumn: store_size
+
+		annotation SummarizationSetBy = Automatic
+
+	column temperature
+		dataType: double
+		lineageTag: 8a62fe92-54da-4b4f-a9df-6ca5b3ce18f0
+		summarizeBy: sum
+		sourceColumn: temperature
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column fuel_price
+		dataType: double
+		lineageTag: a1af4a39-8c43-4b17-a06c-8415ccaf0287
+		summarizeBy: sum
+		sourceColumn: fuel_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column cpi
+		dataType: double
+		lineageTag: 4167e4d7-a482-45c4-9c3f-b46d21770adb
+		summarizeBy: sum
+		sourceColumn: cpi
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column unemployment
+		dataType: double
+		lineageTag: 21877e01-381a-4c7c-8c48-69fb532c06a3
+		summarizeBy: sum
+		sourceColumn: unemployment
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column year
+		dataType: int64
+		formatString: 0
+		lineageTag: 700d7ec0-ead5-4109-88ab-1dc8a227a1d4
+		summarizeBy: sum
+		sourceColumn: year
+
+		annotation SummarizationSetBy = Automatic
+
+	column month
+		dataType: int64
+		formatString: 0
+		lineageTag: 2ea3486d-6860-43dc-a0b8-40f2daefe931
+		summarizeBy: sum
+		sourceColumn: month
+
+		annotation SummarizationSetBy = Automatic
+
+	column week
+		dataType: int64
+		formatString: 0
+		lineageTag: 76b49163-53c2-4a30-bf12-33c71d4ad0f5
+		summarizeBy: sum
+		sourceColumn: week
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearMonthSort = ```
+			
+			YEAR('public retail_eda'[date]) * 100
+			+ MONTH('public retail_eda'[date])
+			
+			
+			```
+		formatString: 0
+		lineageTag: 20215866-1891-46e9-802c-65cb62db8d17
+		summarizeBy: sum
+
+		annotation SummarizationSetBy = Automatic
+
+	column YearMonth = ```
+			
+			FORMAT('public retail_eda'[date], "MMM yyyy")
+			
+			```
+		lineageTag: 519a13b7-e011-4973-8fa4-4c39ac9bfa28
+		summarizeBy: none
+		sortByColumn: YearMonthSort
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'public retail_eda' = m
+		mode: import
+		source =
+				let
+				    Source = PostgreSQL.Database("localhost", "retail_project"),
+				    public_retail_eda = Source{[Schema="public",Item="retail_eda"]}[Data]
+				in
+				    public_retail_eda
+
+	annotation PBI_ResultType = Table
+

@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 venv/
 .vscode/
+# Power BI local files
+**/.pbi/localSettings.json
+**/.pbi/cache.abf

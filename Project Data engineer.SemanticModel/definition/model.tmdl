@@ -1,0 +1,21 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-ID
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_QueryOrder = ["public retail_eda"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table 'public retail_eda'
+ref table DateTableTemplate_f3e6a62e-c804-40f9-98ad-ae9e74dea3e3
+ref table LocalDateTable_c55ae29e-94e0-4b67-8d3c-8f5ce56e9f7e
+
+ref cultureInfo en-US
+
